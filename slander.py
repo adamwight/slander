@@ -61,7 +61,8 @@ class RelayToIRC(irc.IRCClient):
         self.nickname = self.config["irc"]["nick"]
         self.realname = self.config["irc"]["realname"]
         self.channel = self.config["irc"]["channel"]
-        if self.config["sourceURL"]:
+        self.sourceURL = "https://github.com/adamwight/slander"
+        if "sourceURL" in self.config:
             self.sourceURL = self.config["sourceURL"]
 
         irc.IRCClient.connectionMade(self)
@@ -72,8 +73,8 @@ class RelayToIRC(irc.IRCClient):
     def joined(self, channel):
         print "Joined channel %s as %s" % (channel, self.nickname)
         task = LoopingCall(self.check)
-        task.start(config["poll_interval"])
-        print "Started polling jobs, every %d seconds." % (config["poll_interval"], )
+        task.start(self.config["poll_interval"])
+        print "Started polling jobs, every %d seconds." % (self.config["poll_interval"], )
 
     def privmsg(self, user, channel, message):
         if message.find(self.nickname) >= 0:
@@ -121,7 +122,7 @@ class SvnPoller(object):
         revision = str(revision)
         tree = self.svn("log", "-r", revision)
         author = tree.find(".//author").text
-        comment = truncate(strip(tree.find(".//msg").text))
+        comment = truncate(strip(tree.find(".//msg").text), self.config["irc"]["maxlen"])
         url = self.changeset_url(revision)
 
         return (revision, author, comment, url)
@@ -165,7 +166,7 @@ class JiraPoller(FeedPoller):
         if (not m) or (entry.generator_detail.href != self.config["base_url"]):
             return
         issue = m.group(1)
-        summary = truncate(strip(entry.summary))
+        summary = truncate(strip(entry.summary), self.config["irc"]["maxlen"])
         url = self.config["base_url"]+"/browse/%s" % (issue, )
 
         return "%s: %s %s [%s]" % (entry.author_detail.name, issue, summary, url)
@@ -175,7 +176,7 @@ class MinglePoller(FeedPoller):
         m = re.search(r'^(.*/([0-9]+))', entry.id)
         url = m.group(1)
         issue = int(m.group(2))
-        summary = truncate(strip(entry.summary))
+        summary = truncate(strip(entry.summary), self.config["irc"]["maxlen"])
         author = abbrevs(entry.author_detail.name)
 
         return "#%d: (%s) %s [%s]" % (issue, author, summary, url)
@@ -201,9 +202,9 @@ def strip(text, html=True, space=True):
 def abbrevs(name):
     return "".join([w[:1] for w in name.split()])
 
-def truncate(message):
-    if len(message) > config["irc"]["maxlen"]:
-        return (message[:(config["irc"]["maxlen"]-3)] + "...")
+def truncate(message, length):
+    if len(message) > length:
+        return (message[:(length-3)] + "...")
     else:
         return message
 
