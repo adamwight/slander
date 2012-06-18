@@ -38,9 +38,12 @@ This is the configuration file used for the CiviCRM project:
 import sys
 import os
 import re
+import datetime
 
+# pip install pyyaml
 import yaml
 
+#pip install twisted twisted.words
 from twisted.words.protocols import irc
 from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet import reactor
@@ -50,18 +53,27 @@ from xml.etree.cElementTree import parse as xmlparse
 from cStringIO import StringIO
 from subprocess import Popen, PIPE
 
+#pip install feedparser
 import feedparser
 from HTMLParser import HTMLParser
 
 
 class RelayToIRC(irc.IRCClient):
+    """
+    Bot brain will spawn listening jobs and then relay results to an irc channel.
+    TODO:
+    * separate polling manager from irc protocol
+    * operator ACL and commands which perform an action
+    """
+    sourceURL = "https://github.com/adamwight/slander"
+    timestamp = None
+
     def connectionMade(self):
         self.config = self.factory.config
         self.jobs = create_jobs(self.config["jobs"])
         self.nickname = self.config["irc"]["nick"]
         self.realname = self.config["irc"]["realname"]
         self.channel = self.config["irc"]["channel"]
-        self.sourceURL = "https://github.com/adamwight/slander"
         if "sourceURL" in self.config:
             self.sourceURL = self.config["sourceURL"]
 
@@ -78,9 +90,20 @@ class RelayToIRC(irc.IRCClient):
 
     def privmsg(self, user, channel, message):
         if message.find(self.nickname) >= 0:
-            # TODO surely there are useful ways to interact?
             if re.search(r'\bhelp\b', message):
-                self.say(self.channel, "If I only had a brain: %s" % (self.sourceURL, ))
+                self.say(channel, "If I only had a brain: %s -- Commands: help jobs kill last" % (self.sourceURL, ))
+            elif re.search(r'\bjobs\b', message):
+                jobs_desc = [("%s: %s" % (type(j), j.config)) for j in self.jobs]
+                self.say(channel, "Running jobs %s" % (", ".join(jobs_desc), ))
+            #elif re.search(r'\bkill\b', message):
+            #    self.say(self.channel, "Squeal! Killed by %s" % (user, ))
+            #    self.factory.stopTrying()
+            #    self.quit()
+            elif re.search(r'\blast\b', message):
+                if self.timestamp:
+                    self.say(channel, "My last post was %s UTC" % (self.timestamp, ))
+                else:
+                    self.say(channel, "No activity.")
             else:
                 print "Failed to handle incoming command: %s said %s" % (user, message)
 
@@ -89,6 +112,7 @@ class RelayToIRC(irc.IRCClient):
             for line in job.check():
                 self.say(self.channel, str(line))
                 print(line)
+                self.timestamp = datetime.datetime.utcnow()
 
     @staticmethod
     def run(config):
@@ -99,6 +123,10 @@ class RelayToIRC(irc.IRCClient):
         reactor.run()
 
 class SvnPoller(object):
+    """
+    Run "svn info" and "svn log -r REV" to get metadata for the most recent commits.
+    """
+
     def __init__(self, root=None, args=None, changeset_url_format=None):
         self.pre = ["svn", "--xml"] + args.split()
         self.root = root
@@ -122,7 +150,7 @@ class SvnPoller(object):
         revision = str(revision)
         tree = self.svn("log", "-r", revision)
         author = tree.find(".//author").text
-        comment = truncate(strip(tree.find(".//msg").text), self.config["irc"]["maxlen"])
+        comment = truncate(strip(tree.find(".//msg").text))
         url = self.changeset_url(revision)
 
         return (revision, author, comment, url)
@@ -143,14 +171,17 @@ class SvnPoller(object):
 
 
 class FeedPoller(object):
+    """
+    Generic RSS/Atom feed watcher
+    """
     last_seen_id = None
 
-    def __init__(self, **config):
-        print "Initializing feed poller: %s" % (config["source"], )
-        self.config = config
+    def __init__(self, source=None):
+        print "Initializing feed poller: %s" % (source, )
+        self.source = source
 
     def check(self):
-        result = feedparser.parse(self.config["source"])
+        result = feedparser.parse(self.source)
         for entry in result.entries:
             if (not self.last_seen_id) or (self.last_seen_id == entry.id):
                 break
@@ -159,24 +190,37 @@ class FeedPoller(object):
         if result.entries:
             self.last_seen_id = result.entries[0].id
 
+    def parse(self, entry):
+        return "%s [%s]" % (entry.summary, entry.link)
+
 
 class JiraPoller(FeedPoller):
+    """
+    Polls a Jira RSS feed and formats changes to issue trackers.
+    """
+    def __init__(self, base_url=None, **kw):
+        self.base_url = base_url
+        super(JiraPoller, self).__init__(**kw)
+
     def parse(self, entry):
         m = re.search(r'(CRM-[0-9]+)$', entry.link)
-        if (not m) or (entry.generator_detail.href != self.config["base_url"]):
+        if (not m) or (entry.generator_detail.href != self.base_url):
             return
         issue = m.group(1)
-        summary = truncate(strip(entry.summary), self.config["irc"]["maxlen"])
-        url = self.config["base_url"]+"/browse/%s" % (issue, )
+        summary = truncate(strip(entry.summary))
+        url = "%s/browse/%s" % (self.base_url, issue)
 
         return "%s: %s %s [%s]" % (entry.author_detail.name, issue, summary, url)
 
 class MinglePoller(FeedPoller):
+    """
+    Format changes to Mingle cards
+    """
     def parse(self, entry):
         m = re.search(r'^(.*/([0-9]+))', entry.id)
         url = m.group(1)
         issue = int(m.group(2))
-        summary = truncate(strip(entry.summary), self.config["irc"]["maxlen"])
+        summary = truncate(strip(entry.summary))
         author = abbrevs(entry.author_detail.name)
 
         return "#%d: (%s) %s [%s]" % (issue, author, summary, url)
@@ -200,20 +244,31 @@ def strip(text, html=True, space=True):
     return text
 
 def abbrevs(name):
+    """
+    Turn a space-delimited name into initials, e.g. Frank Ubiquitous Zappa -> FUZ
+    """
     return "".join([w[:1] for w in name.split()])
 
-def truncate(message, length):
-    if len(message) > length:
-        return (message[:(length-3)] + "...")
+def truncate(message):
+    if len(message) > maxlen:
+        return (message[:(maxlen-3)] + "...")
     else:
         return message
 
 
 def create_jobs(d):
+    """
+    Read job definitions from a config source, create an instance of the job using its configuration, and store the config for reference.
+    """
+    jobs = []
     for type, options in d.items():
         classname = type.capitalize() + "Poller"
         klass = globals()[classname]
-        yield klass(**options)
+        job = klass(**options)
+        job.config = options
+        jobs.append(job)
+    return jobs
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
@@ -222,4 +277,5 @@ if __name__ == "__main__":
         dotfile = os.path.expanduser("~/.slander")
     print "Reading config from %s" % (dotfile, )
     config = yaml.load(file(dotfile))
+    maxlen = config["irc"]["maxlen"]
     RelayToIRC.run(config)
