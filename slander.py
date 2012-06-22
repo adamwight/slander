@@ -49,14 +49,6 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 
-from xml.etree.cElementTree import parse as xmlparse
-from cStringIO import StringIO
-from subprocess import Popen, PIPE
-
-#pip install feedparser
-import feedparser
-from HTMLParser import HTMLParser
-
 test = False
 maxlen = 200
 config = None
@@ -135,137 +127,6 @@ class RelayToIRC(irc.IRCClient):
         reactor.connectTCP(config["irc"]["host"], config["irc"]["port"], factory)
         reactor.run()
 
-class SvnPoller(object):
-    """
-    Run "svn info" and "svn log -r REV" to get metadata for the most recent commits.
-    """
-
-    def __init__(self, root=None, args=None, changeset_url_format=None):
-        self.pre = ["svn", "--xml"] + args.split()
-        self.root = root
-        self.changeset_url_format = changeset_url_format
-        print "Initializing SVN poller: %s" % (" ".join(self.pre)+" "+root, )
-
-    def svn(self, *cmd):
-        pipe = Popen(self.pre +  list(cmd) + [self.root], stdout=PIPE)
-        try:
-            data = pipe.communicate()[0]
-        except IOError:
-            data = ""
-        return xmlparse(StringIO(data))
-
-    def revision(self):
-        tree = self.svn("info")
-        revision = tree.find(".//commit").get("revision")
-        return int(revision)
-
-    def revision_info(self, revision):
-        revision = str(revision)
-        tree = self.svn("log", "-r", revision)
-        author = tree.find(".//author").text
-        comment = truncate(strip(tree.find(".//msg").text))
-        url = self.changeset_url(revision)
-
-        return (revision, author, comment, url)
-
-    def changeset_url(self, revision):
-        return self.changeset_url_format % (revision, )
-
-    previous_revision = None
-    def check(self):
-        try:
-            latest = self.revision()
-            if self.previous_revision and latest != self.previous_revision:
-                for rev in range(self.previous_revision + 1, latest + 1):
-                    yield "r%s by %s: %s -- %s" % self.revision_info(rev)
-            self.previous_revision = latest
-        except Exception, e:
-            print "ERROR: %s" % e
-
-
-class FeedPoller(object):
-    """
-    Generic RSS/Atom feed watcher
-    """
-    last_seen_id = None
-
-    def __init__(self, source=None):
-        print "Initializing feed poller: %s" % (source, )
-        self.source = source
-
-    def check(self):
-        result = feedparser.parse(self.source)
-        result.entries.reverse()
-        for entry in result.entries:
-            if (not self.last_seen_id) or (self.last_seen_id == entry.id):
-                if not test:
-                    break
-            yield self.parse(entry)
-
-        if result.entries:
-            self.last_seen_id = result.entries[0].id
-
-    def parse(self, entry):
-        return "%s [%s]" % (entry.summary, entry.link)
-
-
-class JiraPoller(FeedPoller):
-    """
-    Polls a Jira RSS feed and formats changes to issue trackers.
-    """
-    def __init__(self, base_url=None, **kw):
-        self.base_url = base_url
-        super(JiraPoller, self).__init__(**kw)
-
-    def parse(self, entry):
-        m = re.search(r'(CRM-[0-9]+)$', entry.link)
-        if (not m) or (entry.generator_detail.href != self.base_url):
-            return
-        issue = m.group(1)
-        summary = truncate(strip(entry.summary))
-        url = "%s/browse/%s" % (self.base_url, issue)
-
-        return "%s: %s %s -- %s" % (entry.author_detail.name, issue, summary, url)
-
-class MinglePoller(FeedPoller):
-    """
-    Format changes to Mingle cards
-    """
-    def parse(self, entry):
-        m = re.search(r'^(.*/([0-9]+))', entry.id)
-        url = m.group(1)
-        issue = int(m.group(2))
-        author = abbrevs(entry.author_detail.name)
-
-        assignments = []
-        details = entry.content[0].value
-        assignment_phrases = [
-            r'(?P<property>[^,>]+) set to (?P<value>[^,<]+)',
-            r'(?P<property>[^,>]+) changed from (?P<previous_value>[^,<]+) to (?P<value>[^,<]+)',
-        ]
-        for pattern in assignment_phrases:
-            for m in re.finditer(pattern, details):
-                normal_form = None
-                if re.match(r'\d{4}/\d{2}/\d{2}|\(not set\)', m.group('value')):
-                    pass
-                elif re.match(r'Planning - Sprint', m.group('property')):
-                    n = re.search(r'(Sprint \d+)', m.group('value'))
-                    normal_form = "->" + n.group(1)
-                else:
-                    normal_form = abbrevs(m.group('property')+" : "+m.group('value'))
-
-                if normal_form:
-                    assignments.append(normal_form)
-        summary = '|'.join(assignments)
-
-        # TODO 'Description changed'
-        for m in re.finditer(r'(?P<property>[^:>]+): (?P<value>[^<]+)', details):
-            if m.group('property') == 'Comment added':
-                summary = m.group('value')+" "+summary
-
-        summary = truncate(summary)
-
-        return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
 
 def strip(text, html=True, space=True):
     class MLStripper(HTMLParser):
@@ -304,12 +165,16 @@ def create_jobs(d):
     """
     jobs = []
     for type_name, options in d.items():
+        m = __import__(type_name)
         classname = type_name.capitalize() + "Poller"
-        klass = globals()[classname]
-        job = klass(**options)
-        job.config = options
-        job.config['class'] = type_name
-        jobs.append(job)
+        if hasattr(m, classname):
+            klass = getattr(m, classname)
+            job = klass(**options)
+            job.config = options
+            job.config['class'] = type_name
+            jobs.append(job)
+        else:
+            sys.exit("Failed to create job of type " + classname)
     return jobs
 
 def load_config(path):
