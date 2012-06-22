@@ -58,6 +58,8 @@ import feedparser
 from HTMLParser import HTMLParser
 
 
+test = False
+
 class RelayToIRC(irc.IRCClient):
     """
     Bot brain will spawn listening jobs and then relay results to an irc channel.
@@ -110,9 +112,11 @@ class RelayToIRC(irc.IRCClient):
     def check(self):
         for job in self.jobs:
             for line in job.check():
-                self.say(self.channel, str(line))
-                print(line)
-                self.timestamp = datetime.datetime.utcnow()
+                if line:
+                    if test:
+                        print(line)
+                    self.say(self.channel, str(line))
+                    self.timestamp = datetime.datetime.utcnow()
 
     @staticmethod
     def run(config):
@@ -182,9 +186,11 @@ class FeedPoller(object):
 
     def check(self):
         result = feedparser.parse(self.source)
+        result.entries.reverse()
         for entry in result.entries:
             if (not self.last_seen_id) or (self.last_seen_id == entry.id):
-                break
+                if not test:
+                    break
             yield self.parse(entry)
 
         if result.entries:
@@ -220,10 +226,37 @@ class MinglePoller(FeedPoller):
         m = re.search(r'^(.*/([0-9]+))', entry.id)
         url = m.group(1)
         issue = int(m.group(2))
-        summary = truncate(strip(entry.summary))
         author = abbrevs(entry.author_detail.name)
 
-        return "#%d: (%s) %s [%s]" % (issue, author, summary, url)
+        assignments = []
+        details = entry.content[0].value
+        assignment_phrases = [
+            r'(?P<property>[^,>]+) set to (?P<value>[^,<]+)',
+            r'(?P<property>[^,>]+) changed from (?P<previous_value>[^,<]+) to (?P<value>[^,<]+)',
+        ]
+        for pattern in assignment_phrases:
+            for m in re.finditer(pattern, details):
+                normal_form = None
+                if re.match(r'\d{4}/\d{2}/\d{2}|\(not set\)', m.group('value')):
+                    pass
+                elif re.match(r'Planning - Sprint', m.group('property')):
+                    n = re.search(r'(Sprint \d+)', m.group('value'))
+                    normal_form = "->" + n.group(1)
+                else:
+                    normal_form = abbrevs(m.group('property')+" : "+m.group('value'))
+
+                if normal_form:
+                    assignments.append(normal_form)
+        summary = '|'.join(assignments)
+
+        # TODO 'Description changed'
+        for m in re.finditer(r'(?P<property>[^:>]+): (?P<value>[^<]+)', details):
+            if m.group('property') == 'Comment added':
+                summary = m.group('value')+" "+summary
+
+        summary = truncate(summary)
+
+        return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
 
 def strip(text, html=True, space=True):
     class MLStripper(HTMLParser):
@@ -240,7 +273,7 @@ def strip(text, html=True, space=True):
         stripper.feed(text)
         text = stripper.get_data()
     if space:
-        text = text.strip().replace("\n", " ")
+        text = re.sub("\s+", " ", text).strip()
     return text
 
 def abbrevs(name):
