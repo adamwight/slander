@@ -12,10 +12,10 @@ EXAMPLE
 This is the configuration file used for the CiviCRM project:
     jobs:
         svn:
-            changeset_url_format:
-                https://fisheye2.atlassian.com/changelog/CiviCRM?cs=%s
             root: http://svn.civicrm.org/civicrm
             args: --username SVN_USER --password SVN_PASSS
+            changeset_url_format:
+                https://fisheye2.atlassian.com/changelog/CiviCRM?cs=%s
         jira:
             base_url:
                 http://issues.civicrm.org/jira
@@ -57,8 +57,9 @@ from subprocess import Popen, PIPE
 import feedparser
 from HTMLParser import HTMLParser
 
-
 test = False
+maxlen = 200
+config = None
 
 class RelayToIRC(irc.IRCClient):
     """
@@ -76,6 +77,9 @@ class RelayToIRC(irc.IRCClient):
         self.nickname = self.config["irc"]["nick"]
         self.realname = self.config["irc"]["realname"]
         self.channel = self.config["irc"]["channel"]
+        global maxlen
+        if "maxlen" in self.config["irc"]:
+            maxlen = self.config["irc"]["maxlen"]
         if "sourceURL" in self.config:
             self.sourceURL = self.config["sourceURL"]
 
@@ -95,8 +99,13 @@ class RelayToIRC(irc.IRCClient):
             if re.search(r'\bhelp\b', message):
                 self.say(channel, "If I only had a brain: %s -- Commands: help jobs kill last" % (self.sourceURL, ))
             elif re.search(r'\bjobs\b', message):
-                jobs_desc = [("%s: %s" % (type(j), j.config)) for j in self.jobs]
-                self.say(channel, "Running jobs %s" % (", ".join(jobs_desc), ))
+                jobs_desc = ", ".join(
+                    [("%s: %s" % (j.config['class'], j.config))
+                        for j in self.jobs]
+                )
+                jobs_desc = re.sub(r'p(ass)?w(ord)?[ :=]*[^ ]+', r'p***word', jobs_desc)
+
+                self.say(channel, "Running jobs [%s]" % (jobs_desc, ))
             #elif re.search(r'\bkill\b', message):
             #    self.say(self.channel, "Squeal! Killed by %s" % (user, ))
             #    self.factory.stopTrying()
@@ -168,7 +177,7 @@ class SvnPoller(object):
             latest = self.revision()
             if self.previous_revision and latest != self.previous_revision:
                 for rev in range(self.previous_revision + 1, latest + 1):
-                    yield "r%s by %s: %s [%s]" % self.revision_info(rev)
+                    yield "r%s by %s: %s -- %s" % self.revision_info(rev)
             self.previous_revision = latest
         except Exception, e:
             print "ERROR: %s" % e
@@ -216,7 +225,7 @@ class JiraPoller(FeedPoller):
         summary = truncate(strip(entry.summary))
         url = "%s/browse/%s" % (self.base_url, issue)
 
-        return "%s: %s %s [%s]" % (entry.author_detail.name, issue, summary, url)
+        return "%s: %s %s -- %s" % (entry.author_detail.name, issue, summary, url)
 
 class MinglePoller(FeedPoller):
     """
@@ -294,21 +303,42 @@ def create_jobs(d):
     Read job definitions from a config source, create an instance of the job using its configuration, and store the config for reference.
     """
     jobs = []
-    for type, options in d.items():
-        classname = type.capitalize() + "Poller"
+    for type_name, options in d.items():
+        classname = type_name.capitalize() + "Poller"
         klass = globals()[classname]
         job = klass(**options)
         job.config = options
+        job.config['class'] = type_name
         jobs.append(job)
     return jobs
 
+def load_config(path):
+    dotfile = os.path.expanduser(path)
+    if os.path.exists(dotfile):
+        print "Reading config from %s" % (dotfile, )
+        return yaml.load(file(dotfile))
+
+def parse_args(args):
+    if len(args) == 2:
+        search_paths = [
+            args[1],
+            "~/.slander-" + args[1],
+            "/etc/slander-" + args[1],
+        ]
+    else:
+        search_paths = [
+            "~/.slander",
+            "/etc/slander",
+        ]
+    for path in search_paths:
+        config = load_config(path)
+        if config:
+            break
+
+    if not config:
+        sys.exit(args[0] + ": No config!")
+
+    return config
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        dotfile = sys.argv[1]
-    else:
-        dotfile = os.path.expanduser("~/.slander")
-    print "Reading config from %s" % (dotfile, )
-    config = yaml.load(file(dotfile))
-    maxlen = config["irc"]["maxlen"]
-    RelayToIRC.run(config)
+    RelayToIRC.run(parse_args(sys.argv))
