@@ -1,5 +1,4 @@
 import feedparser
-from HTMLParser import HTMLParser
 
 class FeedPoller(object):
     """
@@ -14,14 +13,15 @@ class FeedPoller(object):
     def check(self):
         result = feedparser.parse(self.source)
         result.entries.reverse()
+        skipping = True
         for entry in result.entries:
-            if (not self.last_seen_id) or (self.last_seen_id == entry.id):
-                if not test:
-                    break
-            yield self.parse(entry)
+            if (self.last_seen_id == entry.id):
+                skipping = False
+            elif not skipping:
+                yield self.parse(entry)
 
         if result.entries:
-            self.last_seen_id = result.entries[0].id
+            self.last_seen_id = result.entries[-1].id
 
     def parse(self, entry):
         return "%s [%s]" % (entry.summary, entry.link)

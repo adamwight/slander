@@ -1,3 +1,8 @@
+import text
+from feed import FeedPoller
+
+import re
+
 class JiraPoller(FeedPoller):
     """
     Polls a Jira RSS feed and formats changes to issue trackers.
@@ -11,7 +16,7 @@ class JiraPoller(FeedPoller):
         if (not m) or (entry.generator_detail.href != self.base_url):
             return
         issue = m.group(1)
-        summary = truncate(strip(entry.summary))
+        summary = text.strip(entry.summary, truncate=True)
         url = "%s/browse/%s" % (self.base_url, issue)
 
         return "%s: %s %s -- %s" % (entry.author_detail.name, issue, summary, url)

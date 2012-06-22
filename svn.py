@@ -1,3 +1,5 @@
+import text
+
 from xml.etree.cElementTree import parse as xmlparse
 from cStringIO import StringIO
 from subprocess import Popen, PIPE
@@ -30,7 +32,7 @@ class SvnPoller(object):
         revision = str(revision)
         tree = self.svn("log", "-r", revision)
         author = tree.find(".//author").text
-        comment = truncate(strip(tree.find(".//msg").text))
+        comment = text.strip(tree.find(".//msg").text, truncate=True)
         url = self.changeset_url(revision)
 
         return (revision, author, comment, url)

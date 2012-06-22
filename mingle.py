@@ -1,3 +1,8 @@
+import text
+from feed import FeedPoller
+
+import re
+
 class MinglePoller(FeedPoller):
     """
     Format changes to Mingle cards
@@ -6,7 +11,7 @@ class MinglePoller(FeedPoller):
         m = re.search(r'^(.*/([0-9]+))', entry.id)
         url = m.group(1)
         issue = int(m.group(2))
-        author = abbrevs(entry.author_detail.name)
+        author = text.abbrevs(entry.author_detail.name)
 
         assignments = []
         details = entry.content[0].value
@@ -22,18 +27,21 @@ class MinglePoller(FeedPoller):
                 elif re.match(r'Planning - Sprint', m.group('property')):
                     n = re.search(r'(Sprint \d+)', m.group('value'))
                     normal_form = "->" + n.group(1)
+                elif 'Deployed' == m.group('value'):
+                    normal_form = "*Deployed*"
                 else:
-                    normal_form = abbrevs(m.group('property')+" : "+m.group('value'))
+                    normal_form = text.abbrevs(m.group('property')+" : "+m.group('value'))
 
                 if normal_form:
                     assignments.append(normal_form)
         summary = '|'.join(assignments)
 
-        # TODO 'Description changed'
         for m in re.finditer(r'(?P<property>[^:>]+): (?P<value>[^<]+)', details):
             if m.group('property') == 'Comment added':
                 summary = m.group('value')+" "+summary
+        for m in re.finditer(r'Description changed', details):
+            summary += " " + m.group(0)
 
-        summary = truncate(summary)
+        summary = text.trunc(summary)
 
         return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
