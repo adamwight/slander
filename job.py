@@ -1,4 +1,5 @@
 from twisted.internet.task import LoopingCall
+import copy
 
 jobs = []
 
@@ -15,7 +16,7 @@ class JobQueue(object):
             if hasattr(m, classname):
                 klass = getattr(m, classname)
                 job = klass(**options)
-                job.config = options
+                job.config = copy.deepcopy(options)
                 job.config['class'] = type_name
                 jobs.append(job)
             else:

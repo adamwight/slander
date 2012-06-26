@@ -36,7 +36,6 @@ This is the configuration file used for the CiviCRM project:
 '''
 
 from irc import RelayToIRC
-from job import JobQueue
 
 import sys
 import os

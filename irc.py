@@ -30,10 +30,10 @@ class RelayToIRC(irc.IRCClient):
 
     def joined(self, channel):
         print "Joined channel %s as %s" % (channel, self.nickname)
+        self.brain = Brain(self.config, sink=self)
         #XXX get outta here:
         source = JobQueue(self.config["jobs"], self, self.config["poll_interval"])
         source.run()
-        self.brain = Brain(self.config, sink=self)
 
     def privmsg(self, user, channel, message):
         if message.find(self.nickname) >= 0:
@@ -44,7 +44,7 @@ class RelayToIRC(irc.IRCClient):
             for line in data:
                 self.write(line)
             return
-        self.say(self.channel, str(data))
+        self.say(self.channel, data.encode('ascii', 'replace'))
         self.timestamp = datetime.datetime.utcnow()
 
 
