@@ -16,8 +16,8 @@ class MinglePoller(FeedPoller):
         assignments = []
         details = entry.content[0].value
         assignment_phrases = [
-            r'(?P<property>[^,>]+) set to (?P<value>[^,<]+)',
-            r'(?P<property>[^,>]+) changed from (?P<previous_value>[^,<]+) to (?P<value>[^,<]+)',
+            r'(?P<property>[^,>]+) set to (?P<value>[^,<]+\w)',
+            r'(?P<property>[^,>]+) changed from (?P<previous_value>[^,<]+) to (?P<value>[^,<]+\w)',
         ]
         for pattern in assignment_phrases:
             for m in re.finditer(pattern, details):
@@ -44,4 +44,5 @@ class MinglePoller(FeedPoller):
 
         summary = text.trunc(summary)
 
-        return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
+        if summary:
+            return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
