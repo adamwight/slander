@@ -11,6 +11,7 @@ class JobQueue(object):
         """
         self.sink = sink
         self.interval = interval
+        JobQueue.jobs_def = []
         for type_name, options in definition.items():
             classname = type_name.capitalize() + "Poller"
             m = __import__(type_name, fromlist=[classname])
@@ -37,9 +38,14 @@ class JobQueue(object):
                 if line:
                     self.sink.write(line)
 
-    def run(self):
+    @staticmethod
+    def killall():
         for old in JobQueue.threads:
             old.stop()
+        JobQueue.threads = []
+
+    def run(self):
+        JobQueue.killall()
         task = LoopingCall(self.check)
         JobQueue.threads = [task]
         task.start(self.interval)

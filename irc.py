@@ -32,7 +32,11 @@ class RelayToIRC(irc.IRCClient):
         print "Joined channel %s as %s" % (channel, self.nickname)
         self.brain = Brain(self.config, sink=self)
         #XXX get outta here:
-        source = JobQueue(self.config["jobs"], self, self.config["poll_interval"])
+        source = JobQueue(
+            definition=self.config["jobs"],
+            sink=self,
+            interval=self.config["poll_interval"]
+        )
         source.run()
 
     def privmsg(self, user, channel, message):
