@@ -42,7 +42,7 @@ class MinglePoller(FeedPoller):
         for m in re.finditer(r'Description changed', details):
             summary += " " + m.group(0)
 
-        summary = text.trunc(summary)
+        summary = text.strip(summary, truncate=True)
 
         if summary:
             return "#%d: (%s) %s -- %s" % (issue, author, summary, url)
