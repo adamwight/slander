@@ -9,6 +9,9 @@ class MinglePoller(FeedPoller):
     """
     def parse(self, entry):
         m = re.search(r'^(.*/([0-9]+))', entry.id)
+        if not m:
+            print "bad entry, %s" % (entry.id, )
+            return None
         url = m.group(1)
         issue = int(m.group(2))
         author = text.abbrevs(entry.author_detail.name)
@@ -26,7 +29,8 @@ class MinglePoller(FeedPoller):
                     pass
                 elif re.match(r'Planning - Sprint', m.group('property')):
                     n = re.search(r'(Sprint \d+)', m.group('value'))
-                    normal_form = "->" + n.group(1)
+                    if n:
+                        normal_form = "->" + n.group(1)
                 elif 'Deployed' == m.group('value'):
                     normal_form = "*Deployed*"
                 else:

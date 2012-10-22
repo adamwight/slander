@@ -10,7 +10,9 @@ class SvnPoller(object):
     """
 
     def __init__(self, root=None, args=None, changeset_url_format=None):
-        self.pre = ["svn", "--xml"] + args.split()
+        self.pre = ["svn", "--xml"]
+        if args:
+            self.pre += args.split()
         self.root = root
         self.changeset_url_format = changeset_url_format
         print "Initializing SVN poller: %s" % (" ".join(self.pre)+" "+root, )
