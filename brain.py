@@ -1,4 +1,5 @@
 import re
+import json
 
 from job import JobQueue
 
@@ -10,16 +11,24 @@ class Brain(object):
         if "project_url" in self.config:
             self.project_url = self.config["project_url"]
 
-    def say(self, message):
+    def say(self, message, force=False):
+        if not force and 'mute' in self.config and int(self.config['mute']):
+            print("muffling msg: " + message)
+            return
         self.sink.say(self.sink.channel, message)
 
     def respond(self, user, message):
         if re.search(r'\bhelp\b', message):
             self.say("If I only had a brain: %s -- Commands: help config kill last" % (self.project_url, ))
         elif re.search(r'\bconfig\b', message):
-            jobs_desc = JobQueue.describe()
-            jobs_desc = re.sub(r'p(ass)?w(ord)?[ :=]*[^ ]+', r'p***word', jobs_desc)
-            self.say("Configuration [%s]" % (jobs_desc, ))
+            match = re.search(r'\b(?P<name>[^=\s]+)\s*=\s*(?P<value>\S+)', message)
+            if match:
+                self.config[match.group('name')] = match.group('value')
+
+            dump = self.config
+            dump['jobs'] = JobQueue.describe()
+            dump = re.sub(r'p(ass)?w(ord)?[ :=]*[^ ]+', r'p***word', json.dumps(dump))
+            self.say("Configuration: [%s]" % (dump, ), force=True)
         #elif re.search(r'\bkill\b', message):
         #    self.say("Squeal! Killed by %s" % (user, ))
         #    JobQueue.killall()
