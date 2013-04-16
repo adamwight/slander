@@ -25,6 +25,9 @@ class RelayToIRC(irc.IRCClient):
 
         irc.IRCClient.connectionMade(self)
 
+        if "pass" in self.config["irc"]:
+            self.msg("NickServ", "IDENTIFY %s" % self.config["irc"]["pass"])
+
     def signedOn(self):
         self.join(self.channel)
 
