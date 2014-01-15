@@ -1,48 +1,12 @@
 #!/usr/bin/env python
-'''
-Push feed and vcs activities to an IRC channel.  Configured with the ".slander" rc file, or another yaml file specified on the cmd line.
-
-CREDITS
-Miki Tebeka, http://pythonwise.blogspot.com/2009/05/subversion-irc-bot.html
-Eloff, http://stackoverflow.com/a/925630
-rewritten by Adam Wight,
-project homepage is https://github.com/adamwight/slander
-
-EXAMPLE
-This is the configuration file used for the CiviCRM project:
-    jobs:
-        svn:
-            root: http://svn.civicrm.org/civicrm
-            args: --username SVN_USER --password SVN_PASSS
-            changeset_url_format:
-                https://fisheye2.atlassian.com/changelog/CiviCRM?cs=%s
-        jira:
-            base_url:
-                http://issues.civicrm.org/jira
-            source:
-                http://issues.civicrm.org/jira/activity?maxResults=20&streams=key+IS+CRM&title=undefined
-
-    irc:
-        host: irc.freenode.net
-        port: 6667
-        nick: civi-activity
-        realname: CiviCRM svn and jira notification bot
-        channel: "#civicrm" #note that quotes are necessary here
-        maxlen: 200
-
-    poll_interval: 60
-
-    project_url: https://svn.civicrm.org/tools/trunk/bin/scripts/ircbot-civi.py
-'''
+'''Entrypoint'''
 
 from irc import RelayToIRC
 
 import sys
 import os
 
-# pip install pyyaml
 import yaml
-
 
 def load_config(path):
     dotfile = os.path.expanduser(path)
@@ -53,9 +17,11 @@ def load_config(path):
 def parse_args(args):
     if len(args) == 2:
         search_paths = [
+            # Raw filename
             args[1],
-            "~/.slander-" + args[1],
-            "/etc/slander-" + args[1],
+            # or project name
+            "~/.slander-{project}".format(project=args[1]),
+            "/etc/slander/{project}.yaml".format(project=args[1]),
         ]
     else:
         search_paths = [
