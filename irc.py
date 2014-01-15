@@ -26,6 +26,10 @@ class RelayToIRC(irc.IRCClient):
         irc.IRCClient.connectionMade(self)
 
         if "pass" in self.config["irc"]:
+            if "ownermail" in self.config["irc"]:
+                self.msg("NickServ", "REGISTER %s %s" % (self.config["irc"]["pass"], self.config["irc"]["ownermail"]))
+            elif "regverify" in self.config["irc"]:
+                self.msg("NickServ", "VERIFY REGISTER %s %s" % (self.config["irc"]["nick"], self.config["irc"]["regverify"]))
             self.msg("NickServ", "IDENTIFY %s" % self.config["irc"]["pass"])
 
     def signedOn(self):

@@ -8,6 +8,11 @@ class Brain(object):
         self.config = config
         self.sink = sink
         self.project_url = "https://github.com/adamwight/slander"
+        if "irc" in self.config:
+            if "ownermail" in self.config["irc"]:
+                self.config["irc"]["ownermail"] = "xxx@example.com"
+            if "regverify" in self.config["irc"]:
+                self.config["irc"]["regverify"] = "*******"
         if "project_url" in self.config:
             self.project_url = self.config["project_url"]
 
