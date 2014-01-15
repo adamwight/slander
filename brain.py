@@ -27,8 +27,8 @@ class Brain(object):
 
             dump = self.config
             dump['jobs'] = JobQueue.describe()
-            dump = re.sub(r'p(ass)?w(ord)?[ :=]*[^ ]+', r'p***word', json.dumps(dump))
-            self.say("Configuration: [%s]" % (dump, ), force=True)
+            dumpstr = json.dumps(self.redact(dump))
+            self.say("Configuration: [{dump}]".format(dump=dumpstr), force=True)
         #elif re.search(r'\bkill\b', message):
         #    self.say("Squeal! Killed by %s" % (user, ))
         #    JobQueue.killall()
@@ -41,3 +41,15 @@ class Brain(object):
                 self.say("No activity.")
         else:
             print "Failed to handle incoming command: %s said %s" % (user, message)
+
+    def redact(self, data):
+        FORBIDDEN_KEY_PATTERN = r'pw|pass|password'
+        BLACKOUT = "p***word"
+
+        for key, value in data.items():
+            if re.match(FORBIDDEN_KEY_PATTERN, key):
+                data[key] = BLACKOUT
+            elif hasattr(value, 'items'):
+                data[key] = self.redact(value)
+
+        return data
