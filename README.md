@@ -53,8 +53,9 @@ This is... sort of the configuration file used for the CiviCRM project:
     # Measured in seconds
     poll_interval: 60
 
-    # Override the builtin URL so people know how to contribute.
-    project_url: https://svn.civicrm.org/tools/trunk/bin/scripts/ircbot-civi.py
+    # Override the builtin URL if you have forked this project, so people know
+    # how to contribute.
+    source_url: https://svn.civicrm.org/tools/trunk/bin/scripts/ircbot-civi.py
 
 Running
 =======
