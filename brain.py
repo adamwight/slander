@@ -7,14 +7,13 @@ class Brain(object):
     def __init__(self, config, sink=None):
         self.config = config
         self.sink = sink
-        self.project_url = "https://github.com/adamwight/slander"
         if "irc" in self.config:
             if "ownermail" in self.config["irc"]:
                 self.config["irc"]["ownermail"] = "xxx@example.com"
             if "regverify" in self.config["irc"]:
                 self.config["irc"]["regverify"] = "*******"
-        if "project_url" in self.config:
-            self.project_url = self.config["project_url"]
+
+        self.source_url = self.config["source_url"]
 
     def say(self, message, force=False):
         if not force and 'mute' in self.config and int(self.config['mute']):
@@ -24,7 +23,7 @@ class Brain(object):
 
     def respond(self, user, message):
         if re.search(r'\bhelp\b', message):
-            self.say("If I only had a brain: %s -- Commands: help config kill last" % (self.project_url, ))
+            self.say("If I only had a brain: %s -- Commands: help config kill last" % (self.source_url, ))
         elif re.search(r'\bconfig\b', message):
             match = re.search(r'\b(?P<name>[^=\s]+)\s*=\s*(?P<value>\S+)', message)
             if match:

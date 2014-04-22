@@ -36,6 +36,10 @@ def parse_args(args):
     if not config:
         sys.exit(args[0] + ": No config!")
 
+    # normalize some stuff :(
+    if "source_url" not in config:
+        config["source_url"] = "https://github.com/adamwight/slander"
+
     global test
     test = False
     if "test" in config:

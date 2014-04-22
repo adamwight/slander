@@ -23,6 +23,8 @@ class RelayToIRC(irc.IRCClient):
         if "maxlen" in self.config["irc"]:
             text.maxlen = self.config["irc"]["maxlen"]
 
+        self.sourceURL = self.config["source_url"]
+
         irc.IRCClient.connectionMade(self)
 
         if "pass" in self.config["irc"]:
