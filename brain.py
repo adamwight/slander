@@ -4,6 +4,8 @@ import json
 from job import JobQueue
 
 class Brain(object):
+    """Respond to incoming commands"""
+
     def __init__(self, config, sink=None):
         self.config = config
         self.sink = sink

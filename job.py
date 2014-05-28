@@ -2,6 +2,8 @@ from twisted.internet.task import LoopingCall
 import copy
 
 class JobQueue(object):
+    """Create and poll jobs"""
+
     threads = []
     jobs_def = []
 

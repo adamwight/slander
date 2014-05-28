@@ -11,7 +11,7 @@ from brain import Brain
 
 class RelayToIRC(irc.IRCClient):
     """
-    Bot brain will spawn listening jobs and then relay results to an irc channel.
+    Wire bot brain, job queue, and config into a Twisted IRC client
     """
     timestamp = None
 

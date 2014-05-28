@@ -1,3 +1,5 @@
+"""Helpers for text manipulation"""
+
 import re
 from HTMLParser import HTMLParser
 
