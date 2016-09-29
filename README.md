@@ -5,7 +5,8 @@ Installation
 
     git clone https://github.com/adamwight/slander
 
-    pip install twisted feedparser PyYAML irc
+    cd slander
+    sudo pip install -r requirements.txt
 
 OR
 
@@ -62,15 +63,15 @@ Running
 
 To start the bot, call
 
-    ./slander/slander.py
+    ./slander.py
 
 If you want to specify a config file, pass it as an argument:
 
-    ./slander/slander.py /etc/slander/PROJ.yaml
+    ./slander.py /etc/slander/PROJ.yaml
 
 Alternatively, you can give just the project name, and slander will look in /etc/slander/PROJ.yaml:
 
-    ./slander/slander.py PROJ
+    ./slander.py PROJ
 
 Credits
 =======

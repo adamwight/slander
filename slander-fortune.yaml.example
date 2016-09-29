@@ -1,0 +1,21 @@
+jobs:
+    fortune:
+        target: fr-tech
+        # Only accepts "HH:MM" format.
+        # TODO: iso8601 repeating, see https://github.com/cylc/cylc/wiki/ISO-8601
+        at_time: "10:00"
+
+irc:
+    host: irc.freenode.net
+    port: 6667
+    nick: slander
+    # Optional unless your bot is registered
+    #pass: FOO
+    realname: fr-tech-talk notification bot
+    # Note that quotes are necessary around #channames
+    channel: "#wikimedia-fundraising"
+    # Truncate messages longer than this many characters
+    maxlen: 10000
+
+# Measured in seconds
+poll_interval: 60

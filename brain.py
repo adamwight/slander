@@ -26,15 +26,15 @@ class Brain(object):
     def respond(self, user, message):
         if re.search(r'\bhelp\b', message):
             self.say("If I only had a brain: %s -- Commands: help config kill last" % (self.source_url, ))
-        elif re.search(r'\bconfig\b', message):
-            match = re.search(r'\b(?P<name>[^=\s]+)\s*=\s*(?P<value>\S+)', message)
-            if match:
-                self.config[match.group('name')] = match.group('value')
-
-            dump = self.config
-            dump['jobs'] = JobQueue.describe()
-            dumpstr = json.dumps(self.redact(dump))
-            self.say("Configuration: [{dump}]".format(dump=dumpstr), force=True)
+        #elif re.search(r'\bconfig\b', message):
+        #    match = re.search(r'\b(?P<name>[^=\s]+)\s*=\s*(?P<value>\S+)', message)
+        #    if match:
+        #        self.config[match.group('name')] = match.group('value')
+        #
+        #    dump = self.config
+        #    dump['jobs'] = JobQueue.describe()
+        #    dumpstr = json.dumps(self.redact(dump))
+        #    self.say("Configuration: [{dump}]".format(dump=dumpstr), force=True)
         #elif re.search(r'\bkill\b', message):
         #    self.say("Squeal! Killed by %s" % (user, ))
         #    JobQueue.killall()

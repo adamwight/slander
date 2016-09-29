@@ -1,0 +1,4 @@
+feedparser
+irc
+PyYAML
+twisted
